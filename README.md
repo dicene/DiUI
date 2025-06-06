@@ -4,6 +4,8 @@ I'm attempting to build things in an OOP Lua sort of way, so most things are gen
 
 I can't make any promises about functionality or future support. I'll probably stick it on Nexus once I've gotten it a little further along. Currently, it's working for displaying information, but doesn't have a lot of input functionality. I've got a working button PoC, and I'm trying to find a easier setup for devs to be able to use it. I think I'll be able to get buttons, sliders, text input, and checkboxes working. I've also got a pretty ugly implementation of dragging a widget via a button, but it's a ways off from being ready to use. Hopefully I can find a way to implement it on non-button elements, but worst-case, I can probably just use an invisible button if I can't find a way to implement it directly on UserWidgets.
 
+One thing to keep in mind, creating and destroying them repeatedly isn't a terribly efficient way to do things. If you're needing to use several widgets, it's much more efficient to pool them, hide them as they are no longer needed, and re-use them as new widgets are needed.
+
 Devs are free to take whatever they want from this and implement it in their work, if folks want to contribute on here, PRs are welcome.
 
 # Examples
