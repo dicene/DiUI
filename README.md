@@ -96,6 +96,9 @@ ReRandomizeButton = DialogueMenu.ReRandomizeButton
 DialogueMenu:Show()
 ```
 
+
+
+
 ![image](https://github.com/user-attachments/assets/6b614f1f-43a2-4323-838b-87861f075459)
 
 ```lua
