@@ -1,14 +1,28 @@
 local UEHelpers = require("UEHelpers")
 
 local PrintDebugInfo = true
-local DiUtils = require("DiUtils")
-local FindByName = DiUtils.FindByName
 
-local printf = function (text, ...) if not PrintDebugInfo then return end DiUtils.Printf(DiUtils.ColorizeText(200, 180, 120, "ReturningArrows"), text, ...) end
+local printf = function(s,...) if PrintDebugInfo then if not s:match("\n$") then s = "[DiUI] " .. s .. "\n" end return print(s:format(...)) end end
+
+local FindByName = function (class, name)
+    if name == nil then
+        class, name = class:match("^(%w+) (.+)$")
+    end
+
+    if class == nil or name == nil then return CreateInvalidObject() end
+
+    local objs = FindAllOf(class) or {}
+
+    for i = 1, #objs, 1 do
+        if objs[i]:GetFullName():match(name) then
+            return objs[i]
+        end
+    end
+
+    return CreateInvalidObject()
+end
 
 local KingthingsFont = FindByName("Font", "Font_Kingthings_Localized") or CreateInvalidObject() ---@cast KingthingsFont UFont
-
--- local printf = function(s,...) if not PrintDebugInfo then return end if not s:match("\n$") then s = "[DiUI] " .. s .. "\n" end return print(s:format(...)) end
 
 local DiUI = { }
 
@@ -101,7 +115,7 @@ function DiWindow:Show()
     self.InternalWidget:AddToViewport(99999)
 end
 
----Destroys all widgets matching a particular name
+---Destroys all widgets matching a particular name. Be careful with this, and only use widget names that are VERY UNIQUE.
 ---@param name string
 function DiUI.DestroyWidgetsByName(name)
     local widgets = FindAllOf("UserWidget") or {}
@@ -143,9 +157,9 @@ function DiUI.CreateTextBlock(parent, name, text)
     local textBlock = StaticConstructObject(StaticFindObject("/Script/UMG.TextBlock"), parent) ---@cast textBlock UTextBlock
 
     textBlock:SetText(FText(text))
-    KingthingsFont = FindByName("Font", "Font_Kingthings_Localized") or CreateInvalidObject() ---@cast KingthingsFont UFont
+    -- Attempt to grab Kingthings font again if it wasn't already loaded when this script began
+    KingthingsFont = KingthingsFont or FindByName("Font", "Font_Kingthings_Localized") or CreateInvalidObject() ---@cast KingthingsFont UFont
     if KingthingsFont:IsValid() then
-        printf("Kingthings font found: %s", KingthingsFont:GetFullName())
         textBlock.Font.FontObject = KingthingsFont
     end
     textBlock.Font.Size = 16
@@ -190,6 +204,32 @@ function DiUI.CreateVerticalBox(parent)
     local hBox = StaticConstructObject(StaticFindObject("/Script/UMG.VerticalBox"), parent) ---@cast hBox UVerticalBox
 
     return hBox
+end
+
+---@param parent UWidget | DiWindow
+---@return UWBP_ModernPrefab_Button_C
+function DiUI.CreateButton(parent, text)
+    local parent = parent ~= nil and parent.InternalWidget ~= nil and parent.InternalWidget or parent ---@cast parent UWidget
+    local buttonClass = StaticFindObject("/Game/UI/Modern/Prefabs/Buttons/WBP_ModernPrefab_Button.WBP_ModernPrefab_Button_C")
+    -- printf("ButtonClass: %s", buttonClass:GetFullName())
+    -- local button = StaticConstructObject(StaticFindObject("/Game/UI/Modern/Prefabs/Buttons/WBP_ModernPrefab_Button.WBP_ModernPrefab_Button_C"), parent) ---@cast button UWBP_ModernPrefab_Button_C
+    local button = StaticConstructObject(buttonClass, parent) ---@cast button UWBP_ModernPrefab_Button_C
+
+    button:SetButtonText(FText(text))
+    button.ShouldFocusOnHover = false
+    button.ShouldApplyFocusEffectOnHover = true
+
+    ExecuteWithDelay(100, function()
+        button.ButtonTextWidget:SetColorAndOpacity({SpecifiedColor={R=1,G=1,B=1,A=1.000000}, ColorUseRule=0})
+        button.ButtonTextWidget:SetDefaultFontSize(22)
+        button.State_Hover_Left_Fill:SetColorAndOpacity({A=1,R=0.1,G=0.2,B=0.2})
+        button.State_Hover_Middle_FIll:SetColorAndOpacity({A=1,R=0.1,G=0.2,B=0.2})
+        button.State_Hover_Right_Fill:SetColorAndOpacity({A=1,R=0.1,G=0.2,B=0.2})
+    end)
+
+    button:SetDesiredSizeInViewport({X=50,Y=50})
+
+    return button
 end
 
 return DiUI
