@@ -2,6 +2,10 @@
 A basic UI framework for use in Oblivion Remaster modding.
 I'm attempting to build things in an OOP Lua sort of way, so most things are generated with constructors and interacted with by directly calling their methods. I'm also attempting to use valid annotations for everything, which should make it easy to work with in VS Code or another IDE with Lua annotation support.
 
+I can't make any promises about functionality or future support. I'll probably stick it on Nexus once I've gotten it a little further along. Currently, it's working for displaying information, but doesn't have a lot of input functionality. I've got a working button PoC, and I'm trying to find a easier setup for devs to be able to use it. I think I'll be able to get buttons, sliders, text input, and checkboxes working. I've also got a pretty ugly implementation of dragging a widget via a button, but it's a ways off from being ready to use. Hopefully I can find a way to implement it on non-button elements, but worst-case, I can probably just use an invisible button if I can't find a way to implement it directly on UserWidgets.
+
+Devs are free to take whatever they want from this and implement it in their work, if folks want to contribute on here, PRs are welcome.
+
 # Examples
 
 ![image](https://github.com/user-attachments/assets/fd7b57e7-5f86-4903-bd7f-7195bf920986)
