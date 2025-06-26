@@ -1,6 +1,6 @@
 local UEHelpers = require("UEHelpers")
 
-local PrintDebugInfo = true
+local PrintDebugInfo = false
 
 local printf = function(s,...) if PrintDebugInfo then if not s:match("\n$") then s = "[DiUI] " .. s .. "\n" end return print(s:format(...)) end end
 
@@ -49,7 +49,10 @@ function DiWindow:New(name, title, pos)
     newWindow.Pos = pos
 
     -- printf("Constructing UserWidget")
-    local widget = StaticConstructObject(StaticFindObject("/Script/UMG.UserWidget"), UEHelpers.GetWorldContextObject(), FName(string.format("DiWindow_%s_%0.0f", name, math.random(1, 1000000)))) ---@cast widget UUserWidget
+    local outer = UEHelpers.GetGameViewportClient()
+    local widget = StaticConstructObject(StaticFindObject("/Script/UMG.UserWidget"), outer, FName(string.format("DiWindow_%s_%0.0f", name, math.random(1, 1000000)))) ---@cast widget UUserWidget
+    printf("Constructed UserWidget: %s, %s", outer:GetFullName(), widget:GetFullName())
+    newWindow.Name = widget:GetFullName()
     newWindow.InternalWidget = widget
 
     -- printf("Constructing Tree")
@@ -175,11 +178,24 @@ function DiUI.DestroyAllWidgets()
     DiUI.DestroyWidgetsByName("DiWindow_")
 end
 
+local function GetInternalWidget(parent)
+    local parent = parent or CreateInvalidObject() ---@cast parent UWidget
+    -- printf("Parent: %s", parent)
+
+    if parent.InternalWidget ~= nil then
+        -- printf("Parent.InternalWidget ~= nil: %s", parent.InternalWidget)
+        -- printf("\t\t\t%s", parent.InternalWidget:GetFullName())
+        return parent.InternalWidget
+    end
+    -- printf("Parent: %s", parent:GetFullName())
+
+    return parent
+end
+
 ---@param parent UWidget | DiWindow
 ---@return UUserWidget
 function DiUI.CreateUserWidget(parent)
-    local parent = parent or CreateInvalidObject()
-    local parent = parent:IsValid() and parent.InternalWidget:IsValid() and parent.InternalWidget or parent ---@cast parent UWidget
+    local parent = GetInternalWidget(parent)
 
     if not parent:IsValid() then
         return CreateInvalidObject()
@@ -194,8 +210,7 @@ end
 ---@param name string
 ---@return UProgressBar
 function DiUI.CreateProgressBar(parent)
-    local parent = parent or CreateInvalidObject()
-    local parent = parent:IsValid() and parent.InternalWidget:IsValid() and parent.InternalWidget or parent ---@cast parent UWidget
+    local parent = GetInternalWidget(parent)
 
     if not parent:IsValid() then
         return CreateInvalidObject()
@@ -214,9 +229,7 @@ end
 ---@param text string
 ---@return UTextBlock
 function DiUI.CreateTextBlock(parent, text)
-    local parent = parent or CreateInvalidObject()
-    printf("Parent: %s", parent)
-    parent = parent:IsValid() and parent.InternalWidget:IsValid() and parent.InternalWidget or parent ---@cast parent UWidget
+    local parent = GetInternalWidget(parent)
 
     if not parent:IsValid() then
         return CreateInvalidObject()
@@ -244,8 +257,7 @@ end
 ---@param size? FVector2D
 ---@return UImage
 function DiUI.CreateImage(parent, texture2d, size)
-    local parent = parent or CreateInvalidObject()
-    local parent = parent:IsValid() and parent.InternalWidget:IsValid() and parent.InternalWidget or parent ---@cast parent UWidget
+    local parent = GetInternalWidget(parent)
 
     if not parent:IsValid() then
         return CreateInvalidObject()
@@ -266,8 +278,7 @@ end
 ---@param parent UWidget | DiWindow
 ---@return UHorizontalBox
 function DiUI.CreateHorizontalBox(parent)
-    local parent = parent or CreateInvalidObject()
-    local parent = parent:IsValid() and parent.InternalWidget:IsValid() and parent.InternalWidget or parent ---@cast parent UWidget
+    local parent = GetInternalWidget(parent)
 
     if not parent:IsValid() then
         return CreateInvalidObject()
@@ -281,8 +292,7 @@ end
 ---@param parent UWidget | DiWindow
 ---@return UVerticalBox
 function DiUI.CreateVerticalBox(parent)
-    local parent = parent or CreateInvalidObject()
-    local parent = parent:IsValid() and parent.InternalWidget:IsValid() and parent.InternalWidget or parent ---@cast parent UWidget
+    local parent = GetInternalWidget(parent)
 
     if not parent:IsValid() then
         return CreateInvalidObject()
@@ -296,8 +306,7 @@ end
 ---@param parent UWidget | DiWindow
 ---@return USizeBox
 function DiUI.CreateSizeBox(parent)
-    local parent = parent or CreateInvalidObject()
-    local parent = parent:IsValid() and parent.InternalWidget:IsValid() and parent.InternalWidget or parent ---@cast parent UWidget
+    local parent = GetInternalWidget(parent)
 
     if not parent:IsValid() then
         return CreateInvalidObject()
