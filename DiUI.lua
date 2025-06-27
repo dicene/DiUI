@@ -22,7 +22,8 @@ local FindByName = function (class, name)
     return CreateInvalidObject()
 end
 
-local KingthingsFont = FindByName("Font", "Font_Kingthings_Localized") or CreateInvalidObject() ---@cast KingthingsFont UFont
+-- CORRECTED: Font is no longer searched for at load time. It will be found on first use in CreateTextBlock.
+local KingthingsFont = nil ---@cast KingthingsFont UFont
 
 local DiUI = { }
 
@@ -48,63 +49,44 @@ function DiWindow:New(name, title, pos)
     newWindow.Title = title
     newWindow.Pos = pos
 
-    -- printf("Constructing UserWidget")
     local outer = UEHelpers.GetGameViewportClient()
     local widget = StaticConstructObject(StaticFindObject("/Script/UMG.UserWidget"), outer, FName(string.format("DiWindow_%s_%0.0f", name, math.random(1, 1000000)))) ---@cast widget UUserWidget
     printf("Constructed UserWidget: %s, %s", outer:GetFullName(), widget:GetFullName())
     newWindow.Name = widget:GetFullName()
     newWindow.InternalWidget = widget
 
-    -- printf("Constructing Tree")
     local tree = StaticConstructObject(StaticFindObject("/Script/UMG.WidgetTree"), widget) ---@cast tree UWidgetTree
     widget.WidgetTree = tree
     newWindow.InternalTree = tree
 
-    -- printf("Constructing Border")
-    local border = StaticConstructObject(StaticFindObject("/Script/UMG.Border"), widget.WidgetTree) ---@cast border UBorder
-
-    -- printf("Setting up Border")
-    -- border.BrushColor = {A=0.2,R=.8,G=.4,B=.1}
+    local border = StaticConstructObject(StaticFindObject("/Script/UMG.Border"), widget) ---@cast border UBorder
+    
     border:SetBrushColor({A=1,R=0,G=0,B=0})
-    -- border:SetBrushFromTexture(nil)
     border.Background.ImageType = 0
-    -- border.Background.TintColor = {SpecifiedColor={A=1,R=0,G=0,B=0}, ColorUseRule=0}
     border:SetContentColorAndOpacity({A=1,R=1,G=1,B=1})
     border.Background.OutlineSettings.RoundingType = 0
     border.Background.OutlineSettings.CornerRadii = {X=5,Y=5,Z=5,W=5}
     border.Background.OutlineSettings.Color = {SpecifiedColor={A=1,R=0.2,G=0.2,B=0.2}, ColorUseRule=0}
     border.Background.OutlineSettings.bUseBrushTransparency = false
     border.Background.OutlineSettings.Width = 2.0
-    -- border.Color
-
-    border:SetDesiredSizeScale({X=1,Y=1})
     border:SetPadding({Left=4,Right=4,Top=4,Bottom=4})
     border.Background.DrawAs = 4
-    -- tree.RootWidget = border
+
     widget.WidgetTree.RootWidget = border
     newWindow.InternalBorder = border
-    -- tree.RootWidget = border
 
-    -- printf("Constructing VerticalBox")
-    local vBox = StaticConstructObject(StaticFindObject("/Script/UMG.VerticalBox"), border) ---@cast vBox, UVerticalBox
+    local vBox = StaticConstructObject(StaticFindObject("/Script/UMG.VerticalBox"), widget) ---@cast vBox, UVerticalBox
     newWindow.InternalVBox = vBox
 
-    -- border:AddChild(vBox)
-    widget.WidgetTree.RootWidget:AddChild(vBox)
+    border:AddChild(vBox)
 
-    -- widget:AddToViewport(99)
-    -- widget:SetPositionInViewport({X=200,Y=200}, false)
     widget:SetPositionInViewport({X=pos.X,Y=pos.Y}, false)
-    -- printf("Setting Widget up in Viewport")
-    -- widget:SetDesiredSizeInViewport({X=200, Y=200})
-    -- widget:SetPositionInViewport({X=pos.X,Y=pos.Y}, false)
     printf("Finished creating new DiWindow.")
     return newWindow
 end
 
 ---@param newPos FVector2D
 function DiWindow:SetPos(newPos, bRemoveDPIScale)
-    -- printf("Setting DiWindow Position: (X=%0.0f, Y=%0.0f)", newPos.X, newPos.Y)
     self.Pos = newPos
     self.InternalWidget:SetPositionInViewport({X=newPos.X,Y=newPos.Y}, bRemoveDPIScale)
 end
@@ -141,7 +123,14 @@ function DiWindow:CreateHorizontalBox()
     return DiUI.CreateHorizontalBox(self.InternalWidget)
 end
 
----@return UVerticalBox
+function DiWindow:CreateScrollBox()
+    return DiUI.CreateScrollBox(self.InternalWidget)
+end
+
+function DiWindow:CreateEditableTextBox()
+    return DiUI.CreateEditableTextBox(self.InternalWidget)
+end
+
 function DiWindow:CreateVerticalBox()
     return DiUI.CreateVerticalBox(self.InternalWidget)
 end
@@ -158,97 +147,74 @@ function DiWindow:CreateButton(text, clickFunction)
     return DiUI.CreateButton(self.InternalWidget, text, clickFunction)
 end
 
----Destroys all widgets matching a particular name. Be careful with this, and only use widget names that are VERY UNIQUE.
----@param name string
 function DiUI.DestroyWidgetsByName(name)
     local widgets = FindAllOf("UserWidget") or {}
-
     for i = 1, #widgets do
         local widget = widgets[i]
-        local fullName = widget:GetFullName()
-        if fullName:match(name) then
+        if widget:GetFullName():match(name) then
             printf("Killing widget %s", widget:GetFullName())
             widget:RemoveFromParent()
         end
     end
 end
 
----Destroys all DiWindows
 function DiUI.DestroyAllWidgets()
     DiUI.DestroyWidgetsByName("DiWindow_")
 end
 
 local function GetInternalWidget(parent)
-    local parent = parent or CreateInvalidObject() ---@cast parent UWidget
-    -- printf("Parent: %s", parent)
-
-    if parent.InternalWidget ~= nil then
-        -- printf("Parent.InternalWidget ~= nil: %s", parent.InternalWidget)
-        -- printf("\t\t\t%s", parent.InternalWidget:GetFullName())
+    if parent and parent.InternalWidget then
         return parent.InternalWidget
     end
-    -- printf("Parent: %s", parent:GetFullName())
-
     return parent
 end
 
 ---@param parent UWidget | DiWindow
 ---@return UUserWidget
 function DiUI.CreateUserWidget(parent)
-    local parent = GetInternalWidget(parent)
-
-    if not parent:IsValid() then
-        return CreateInvalidObject()
-    end
-
-    local userWidget = StaticConstructObject(StaticFindObject("/Script/UMG.UserWidget"), parent) ---@cast userWidget UUserWidget
-
-    return userWidget
+    local owner = GetInternalWidget(parent)
+    if not owner or not owner:IsValid() then return CreateInvalidObject() end
+    return StaticConstructObject(StaticFindObject("/Script/UMG.UserWidget"), owner)
 end
 
 ---@param parent UWidget | DiWindow
----@param name string
 ---@return UProgressBar
 function DiUI.CreateProgressBar(parent)
-    local parent = GetInternalWidget(parent)
+    local owner = GetInternalWidget(parent)
+    if not owner or not owner:IsValid() then return CreateInvalidObject() end
 
-    if not parent:IsValid() then
-        return CreateInvalidObject()
-    end
-
-    local progressBar = StaticConstructObject(StaticFindObject("/Script/UMG.ProgressBar"), parent) ---@cast progressBar UProgressBar
+    local progressBar = StaticConstructObject(StaticFindObject("/Script/UMG.ProgressBar"), owner) ---@cast progressBar UProgressBar
     progressBar.ColorAndOpacity = {SpecifiedColor={A=1, R=0, G=0, B=0}, ColorUseRule=0}
     progressBar:SetPercent(0.80)
     progressBar:SetFillColorAndOpacity({A=1, R=0.1, G=1, B=0.0})
-
     return progressBar
 end
 
 ---@param parent UWidget | DiWindow
----@param name string
 ---@param text string
 ---@return UTextBlock
 function DiUI.CreateTextBlock(parent, text)
-    local parent = GetInternalWidget(parent)
-
-    if not parent:IsValid() then
-        return CreateInvalidObject()
-    end
+    local owner = GetInternalWidget(parent)
+    if not owner or not owner:IsValid() then return CreateInvalidObject() end
 
     local text = text or "[Text]"
-    local textBlock = StaticConstructObject(StaticFindObject("/Script/UMG.TextBlock"), parent) ---@cast textBlock UTextBlock
+    local textBlock = StaticConstructObject(StaticFindObject("/Script/UMG.TextBlock"), owner) ---@cast textBlock UTextBlock
 
     textBlock:SetText(FText(text))
-    -- Attempt to grab Kingthings font again if it wasn't already loaded when this script began
-    KingthingsFont = KingthingsFont or FindByName("Font", "Font_Kingthings_Localized") or CreateInvalidObject() ---@cast KingthingsFont UFont
-    if KingthingsFont:IsValid() then
+    
+    -- Lazily find the font only on the first run, preventing load-time errors.
+    if not KingthingsFont or not KingthingsFont:IsValid() then
+        KingthingsFont = FindByName("Font", "Font_Kingthings_Localized")
+    end
+    
+    if KingthingsFont and KingthingsFont:IsValid() then
         textBlock.Font.FontObject = KingthingsFont
     end
+
     textBlock.Font.Size = 16
     textBlock:SetJustification(1)
     textBlock.ColorAndOpacity = {SpecifiedColor={A=1, R=1, G=1, B=1}, ColorUseRule=0}
     textBlock.ShadowColorAndOpacity = {A=1, R=0, G=0, B=0}
-
     return textBlock
 end
 
@@ -257,125 +223,109 @@ end
 ---@param size? FVector2D
 ---@return UImage
 function DiUI.CreateImage(parent, texture2d, size)
-    local parent = GetInternalWidget(parent)
+    local owner = GetInternalWidget(parent)
+    if not owner or not owner:IsValid() then return CreateInvalidObject() end
 
-    if not parent:IsValid() then
-        return CreateInvalidObject()
-    end
-
-    local image = StaticConstructObject(StaticFindObject("/Script/UMG.Image"), parent) ---@cast image UImage
-
+    local image = StaticConstructObject(StaticFindObject("/Script/UMG.Image"), owner) ---@cast image UImage
     if size == nil then
         image:SetBrushFromTexture(texture2d, true)
     else
         image:SetBrushFromTexture(texture2d, false)
         image:SetDesiredSizeOverride(size)
     end
-
     return image
 end
 
 ---@param parent UWidget | DiWindow
 ---@return UHorizontalBox
 function DiUI.CreateHorizontalBox(parent)
-    local parent = GetInternalWidget(parent)
-
-    if not parent:IsValid() then
-        return CreateInvalidObject()
-    end
-
-    local hBox = StaticConstructObject(StaticFindObject("/Script/UMG.HorizontalBox"), parent) ---@cast hBox UHorizontalBox
-
-    return hBox
+    local owner = GetInternalWidget(parent)
+    if not owner or not owner:IsValid() then return CreateInvalidObject() end
+    return StaticConstructObject(StaticFindObject("/Script/UMG.HorizontalBox"), owner)
 end
 
 ---@param parent UWidget | DiWindow
 ---@return UVerticalBox
 function DiUI.CreateVerticalBox(parent)
-    local parent = GetInternalWidget(parent)
-
-    if not parent:IsValid() then
-        return CreateInvalidObject()
-    end
-
-    local hBox = StaticConstructObject(StaticFindObject("/Script/UMG.VerticalBox"), parent) ---@cast hBox UVerticalBox
-
-    return hBox
+    local owner = GetInternalWidget(parent)
+    if not owner or not owner:IsValid() then return CreateInvalidObject() end
+    return StaticConstructObject(StaticFindObject("/Script/UMG.VerticalBox"), owner)
 end
 
 ---@param parent UWidget | DiWindow
 ---@return USizeBox
 function DiUI.CreateSizeBox(parent)
-    local parent = GetInternalWidget(parent)
-
-    if not parent:IsValid() then
-        return CreateInvalidObject()
-    end
-
-    local sizeBox = StaticConstructObject(StaticFindObject("/Script/UMG.SizeBox"), parent) ---@cast sizeBox USizeBox
-
-    return sizeBox
+    local owner = GetInternalWidget(parent)
+    if not owner or not owner:IsValid() then return CreateInvalidObject() end
+    return StaticConstructObject(StaticFindObject("/Script/UMG.SizeBox"), owner)
 end
 
 ---@type TMap<string, function>
 local ButtonClickCallbacks = {}
-
----@type number
 local ButtonClickHook
 
 local function RegisterButtonClickHook()
     if not ButtonClickHook then
         ButtonClickHook = RegisterHook("Function /Script/CommonUI.CommonButtonBase:HandleButtonPressed", function(button)
-            local button = button:get()
-            local buttonName = button:GetFullName()
-            if ButtonClickCallbacks[buttonName] ~= nil then
+            local btn = button:get()
+            local buttonName = btn:GetFullName()
+            if ButtonClickCallbacks[buttonName] then
                 ButtonClickCallbacks[buttonName]()
             end
         end)
     end
 end
 
--- if not (StaticFindObject("/Game/UI/Modern/Prefabs/Buttons/WBP_ModernPrefab_Button.WBP_ModernPrefab_Button_C") or CreateInvalidObject()):IsValid() then
---     ExecuteInGameThread(function()
---         LoadAsset("/Game/UI/Modern/Prefabs/Buttons/WBP_ModernPrefab_Button.WBP_ModernPrefab_Button_C")
+---@param parent UWidget | DiWindow
+---@return UScrollBox
+---@param parent UWidget | DiWindow
+---@return UScrollBox
+function DiUI.CreateScrollBox(parent)
+    local owner = GetInternalWidget(parent)
+    if not owner or not owner:IsValid() then
+        printf("Invalid parent passed to .")
+        return CreateInvalidObject()
+    end
 
---         RegisterHook("Function /Game/UI/Modern/Prefabs/Buttons/WBP_ModernPrefab_Button.WBP_ModernPrefab_Button_C:OnInitButtonWidgets", function(button)
---             printf("OnInitButtonWidgets()")
---         end)
---     end)
--- else
---     RegisterHook("Function /Game/UI/Modern/Prefabs/Buttons/WBP_ModernPrefab_Button.WBP_ModernPrefab_Button_C:OnInitButtonWidgets", function(button)
---         printf("OnInitButtonWidgets()")
---     end)
--- end
+    local scrollBox = StaticConstructObject(StaticFindObject("/Script/UMG.ScrollBox"), owner) ---@cast scrollBox UScrollBox
+    if not scrollBox or not scrollBox:IsValid() then return CreateInvalidObject() end
+
+    scrollBox:SetOrientation(1) -- Vertical
+    scrollBox:SetScrollBarVisibility(5) -- AlwaysShow
+    return scrollBox
+end
+
+
+---@param parent UWidget | DiWindow
+---@return UEditableTextBox
+function DiUI.CreateEditableTextBox(parent)
+    local owner = GetInternalWidget(parent)
+    if not owner or not owner:IsValid() then return CreateInvalidObject() end
+
+    local textBox = StaticConstructObject(StaticFindObject("/Script/UMG.EditableTextBox"), owner) ---@cast textBox UEditableTextBox
+    return textBox
+end
+
 
 ---@param parent UWidget | DiWindow
 ---@param text string
 ---@param clickFunction function
 ---@return UWBP_ModernPrefab_Button_C
 function DiUI.CreateButton(parent, text, clickFunction)
-    local parent = parent or CreateInvalidObject()
-    local parent = parent:IsValid() and parent.InternalWidget:IsValid() and parent.InternalWidget or parent ---@cast parent UWidget
-
-    if not parent:IsValid() then
+    local owner = GetInternalWidget(parent)
+    if not owner or not owner:IsValid() then
+        printf("Invalid parent passed to CreateButton.")
         return CreateInvalidObject()
     end
 
     local buttonClass = StaticFindObject("/Game/UI/Modern/Prefabs/Buttons/WBP_ModernPrefab_Button.WBP_ModernPrefab_Button_C") or CreateInvalidObject()
-
     if not buttonClass:IsValid() then
-        printf("Loading button asset!")
         LoadAsset("/Game/UI/Modern/Prefabs/Buttons/WBP_ModernPrefab_Button.WBP_ModernPrefab_Button_C")
         buttonClass = StaticFindObject("/Game/UI/Modern/Prefabs/Buttons/WBP_ModernPrefab_Button.WBP_ModernPrefab_Button_C") or CreateInvalidObject()
     end
+    if not buttonClass:IsValid() then return CreateInvalidObject() end
 
-    if not buttonClass:IsValid() then
-        printf("Failed to load ModernPrefab_Button.")
-        return CreateInvalidObject()
-    end
-    -- printf("ButtonClass: %s", buttonClass:GetFullName())
-    local button = StaticConstructObject(buttonClass, parent) or CreateInvalidObject() ---@cast button UWBP_ModernPrefab_Button_C
-
+    local button = StaticConstructObject(buttonClass, owner) or CreateInvalidObject() ---@cast button UWBP_ModernPrefab_Button_C
     if button:IsValid() then
         button:SetButtonText(FText(text))
         button.ShouldFocusOnHover = false
@@ -386,21 +336,26 @@ function DiUI.CreateButton(parent, text, clickFunction)
         ButtonClickCallbacks[button:GetFullName()] = clickFunction
 
         ExecuteAsync(function()
-            ExecuteInGameThread(function ()
-                if button.ButtonTextWidget:IsValid() then
-                    button.ButtonTextWidget:SetColorAndOpacity({SpecifiedColor={R=1,G=1,B=1,A=1.000000}, ColorUseRule=0})
-                    button.ButtonTextWidget:SetDefaultFontSize(22)
+            ExecuteInGameThread(function()
+                if button and button:IsValid() then
+                    if button.ButtonTextWidget and button.ButtonTextWidget:IsValid() then
+                        button.ButtonTextWidget:SetColorAndOpacity({SpecifiedColor = { R = 1, G = 1, B = 1, A = 1.0 }, ColorUseRule = 0})
+                        button.ButtonTextWidget:SetDefaultFontSize(22)
+                    end
+                    if button.State_Hover_Left_Fill and button.State_Hover_Left_Fill:IsValid() then
+                        button.State_Hover_Left_Fill:SetColorAndOpacity({ A = 1, R = 0.1, G = 0.2, B = 0.2 })
+                    end
+                    if button.State_Hover_Middle_FIll and button.State_Hover_Middle_FIll:IsValid() then
+                        button.State_Hover_Middle_FIll:SetColorAndOpacity({ A = 1, R = 0.1, G = 0.2, B = 0.2 })
+                    end
+                    if button.State_Hover_Right_Fill and button.State_Hover_Right_Fill:IsValid() then
+                        button.State_Hover_Right_Fill:SetColorAndOpacity({ A = 1, R = 0.1, G = 0.2, B = 0.2 })
+                    end
+                    button:SetVisibility(0)
                 end
-                if button.State_Hover_Left_Fill:IsValid() then button.State_Hover_Left_Fill:SetColorAndOpacity({A=1,R=0.1,G=0.2,B=0.2}) end
-                if button.State_Hover_Middle_FIll:IsValid() then button.State_Hover_Middle_FIll:SetColorAndOpacity({A=1,R=0.1,G=0.2,B=0.2}) end
-                if button.State_Hover_Right_Fill:IsValid() then button.State_Hover_Right_Fill:SetColorAndOpacity({A=1,R=0.1,G=0.2,B=0.2}) end
-                button:SetVisibility(0)
             end)
         end)
     end
-
-    -- button:SetDesiredSizeInViewport({X=50,Y=50})
-
     return button
 end
 
